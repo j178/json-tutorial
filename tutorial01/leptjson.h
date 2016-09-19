@@ -5,7 +5,9 @@ typedef enum { LEPT_NULL, LEPT_FALSE, LEPT_TRUE, LEPT_NUMBER, LEPT_STRING, LEPT_
 
 typedef struct {
     lept_type type;
-}lept_value;
+    //新加的字段, 要怎么定义?
+    int value;
+} lept_value;
 
 enum {
     LEPT_PARSE_OK = 0,
@@ -14,8 +16,9 @@ enum {
     LEPT_PARSE_ROOT_NOT_SINGULAR
 };
 
-int lept_parse(lept_value* v, const char* json);
+int lept_parse(lept_value *v, const char *json);
 
-lept_type lept_get_type(const lept_value* v);
+lept_type lept_get_type(const lept_value *v);
 
+int lept_get_value(const lept_value *v);
 #endif /* LEPTJSON_H__ */

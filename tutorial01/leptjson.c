@@ -33,14 +33,12 @@ static int lept_parse_bool(lept_context *c, lept_value *v, const char *bool) {
 
     char bool_type = bool[0];
     EXPECT(c, *bool++);
-    const char *p = c->json;
 
     while (*bool) {
-        if (*p++ != *bool++) {
+        if (*c->json++ != *bool++) {
             return LEPT_PARSE_INVALID_VALUE;
         }
     }
-    c->json = p;
 
     if (bool_type == 't') {
         v->type = LEPT_TRUE;
@@ -51,19 +49,45 @@ static int lept_parse_bool(lept_context *c, lept_value *v, const char *bool) {
 }
 
 static int lept_parse_true(lept_context *c, lept_value *v) {
-    //内部改变一下函数的实现
+
     return lept_parse_bool(c, v, "true");
 }
 
 static int lept_parse_false(lept_context *c, lept_value *v) {
 
-    EXPECT(c, 'f');
-    if (c->json[0] != 'a' || c->json[1] != 'l' || c->json[2] != 's' || c->json[3] != 'e') {
-        return LEPT_PARSE_INVALID_VALUE;
+    return lept_parse_bool(c, v, "false");
+}
+
+static int lept_is_number(char ch) {
+
+    return ch >= '0' && ch <= '9';
+}
+
+static int lept_parse_number(lept_context *c, lept_value *v) {
+
+    const char *start;
+    if (*c->json == '+') start = ++c->json;
+    else if (*c->json == '-') start = c->json;
+
+    int allow_point = 1;
+    double result = 0;
+    double factor = 10;
+    while (lept_is_number(*c->json) || *c->json == '.') {
+        if (*c->json == '.') {
+            if (allow_point) {
+                allow_point = 0;
+                factor = 0.1;
+                result += (*c->json - '0') * factor;
+            } else {
+                return LEPT_PARSE_INVALID_VALUE;
+            }
+
+        }
+
+        result = result * factor + (*c->json - '0');
+        ++c->json;
     }
-    c->json += 4;
-    v->type = LEPT_FALSE;
-    return 0;
+    return result;
 }
 
 static int lept_parse_value(lept_context *c, lept_value *v) {
@@ -79,15 +103,27 @@ static int lept_parse_value(lept_context *c, lept_value *v) {
         case 'f':
             r = lept_parse_false(c, v);
             break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '+':
+        case '-':
+            r = lept_parse_number(c, v);
+            break;
         case '\0':
             return LEPT_PARSE_EXPECT_VALUE;
         default:
             return LEPT_PARSE_INVALID_VALUE;
     }
 
-    if (r != 0) {
-        return r;
-    }
+    if (r != 0) return r;
 
     lept_parse_whitespace(c);
     if (*c->json != '\0') {
@@ -111,4 +147,9 @@ lept_type lept_get_type(const lept_value *v) {
 
     assert(v != NULL);
     return v->type;
+}
+
+int lept_get_value(const lept_value *v) {
+
+    return 0;
 }
