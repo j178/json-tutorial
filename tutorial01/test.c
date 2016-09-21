@@ -123,7 +123,7 @@ static void test_parse_number() {
     TEST_NUMBER(1.234E+10, "1.234E+10");
     TEST_NUMBER(1.234E-10, "1.234E-10");
     TEST_NUMBER(0.0, "1e-10000"); /* must underflow */
-    //todo 增加边界值检验
+    //增加边界值检验
     TEST_NUMBER(1.0000000000000002, "1.0000000000000002"); /* the smallest number > 1 */
     TEST_NUMBER(4.9406564584124654e-324, "4.9406564584124654e-324"); /* minimum denormal */
     TEST_NUMBER(-4.9406564584124654e-324, "-4.9406564584124654e-324");
@@ -143,6 +143,19 @@ static void test_parse_number_too_big() {
 #endif
 }
 
+static void test_parse_string() {
+    //1. 字符串用什么存?
+    //2. 什么样的字符串无效? http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf
+    //
+    //
+    lept_value v;
+    //读入字符串的时候要给所有的'\'前面加上一个'\'
+    EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, "\"he你好啊\\\"llo\""));
+    EXPECT_EQ_INT(LEPT_PARSE_ROOT_NOT_SINGULAR, lept_parse(&v, ""));
+    EXPECT_EQ_INT(LEPT_STRING, lept_get_type(&v));
+    puts(lept_get_string(&v));
+}
+
 static void test_parse() {
 
     test_parse_null();
@@ -153,6 +166,7 @@ static void test_parse() {
     test_parse_root_not_singular();
     test_parse_number();
     test_parse_number_too_big();
+    test_parse_string();
 }
 
 int main() {

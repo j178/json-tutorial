@@ -3,6 +3,7 @@
 #include <stdlib.h>  /* NULL, strtod() */
 #include <math.h> //HUGEVAL
 #include <errno.h> //errno, ERANGE
+#include <string.h>
 
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
 
@@ -53,14 +54,13 @@ static int lept_parse_literal(lept_context *c, lept_value *v, lept_type type) {
  * int = "0" / digit1-9 *digit
  * frac = "." 1*digit
  * exp = ("e" / "E") ["-" / "+"] 1*digit
- * @param c
- * @param v
- * @return
  */
 static int lept_parse_number(lept_context *c, lept_value *v) {
 
     //负号->整数->小数->指数
     //^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$
+    //takes as many characters as possible to form a valid floating point representation
+    //做数字转换都是这种思想, 基本不会出错, 转换尽可能多的字符, 剩下的不动, 原样返回
     const char *p = c->json;
     if (*p == '-') p++;
     if (*p == '0') p++;
@@ -81,13 +81,33 @@ static int lept_parse_number(lept_context *c, lept_value *v) {
     }
 
     errno = 0;
-    double n = strtod(c->json, NULL);
-    if (errno == ERANGE && (n == HUGE_VAL || n == -HUGE_VAL)) return LEPT_PARSE_NUMBER_TOO_BIG; //HUGE_VAL == inf
+    v->n = strtod(c->json, NULL);
+    if (errno == ERANGE && (v->n == HUGE_VAL || v->n == -HUGE_VAL)) return LEPT_PARSE_NUMBER_TOO_BIG; //HUGE_VAL == inf
 
     c->json = p;
-    v->n = n;
     v->type = LEPT_NUMBER;
 
+    return LEPT_PARSE_OK;
+}
+
+static int lept_parse_string(lept_context *c, lept_value *v) {
+    //1. 尽可能多的解析字符吗?
+    //2. 解析完成的字符如何拷贝?
+    //3. 对于转义字符, 读入内存后会以什么样的形式给我呢? 比如说 '\n' 是两个字符还是一个 ord==10 的字符?
+    //那么对于C语言中非法的转义, 结果会是怎么样的呢? => 对于非法的转义如 '\x', 编译器会去掉 '\', 只剩下 'x'
+    EXPECT(c, '"');
+    const char *p = c->json;
+    while (*(p - 1) == '\\' || *p != '"') { //退出时 *p == '"'
+        if (*p == '\0')
+            return LEPT_PARSE_INVALID_VALUE;
+        p++;
+    }
+
+    unsigned long len = p - c->json + 2; //两个引号
+    v->string = (char *) calloc(sizeof(char), len + 1); //最后的\0
+    strncpy(v->string, c->json - 1, len);    //遗留问题: 长度刚刚好, 所以结尾应该没有\0, 使用calloc全部初始化为0
+    c->json = ++p;
+    v->type = LEPT_STRING;
     return LEPT_PARSE_OK;
 }
 
@@ -97,6 +117,7 @@ static int lept_parse_value(lept_context *c, lept_value *v) {
         case 'n': return lept_parse_literal(c, v, LEPT_NULL);
         case 't': return lept_parse_literal(c, v, LEPT_TRUE);
         case 'f': return lept_parse_literal(c, v, LEPT_FALSE);
+        case '"': return lept_parse_string(c, v);
         case '\0': return LEPT_PARSE_EXPECT_VALUE;
         default: return lept_parse_number(c, v);
     }
@@ -132,4 +153,9 @@ double lept_get_number(const lept_value *v) {
 
     assert(v != NULL && v->type == LEPT_NUMBER);
     return v->n;
+}
+
+char *lept_get_string(const lept_value *v) {
+
+    return v->string;
 }
