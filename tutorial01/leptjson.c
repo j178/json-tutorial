@@ -10,7 +10,7 @@
     #define LEPT_PARSE_STACK_INIT_SIZE 256
 #endif
 
-#define EXPECT(c, ch)  do { assert(*c->json == (ch)); c->json++; } while(0)
+#define EXPECT(c, ch) do { assert(*c->json == (ch)); c->json++; } while(0)
 
 typedef struct {
     const char *json;
@@ -163,8 +163,8 @@ static char unescape(const char **p) {
     }
 }
 
-#define IS_VALID_CHAR(c) (c) == '\x20' || (c) == '\x21' || ((c) >= '\x23' && (c) <= '\x5B') \
-    || ((c) >= '\x5D' && (c) <= '\x10\xFF\xFF')
+#define IS_VALID_CHAR(c) ((c) == '\x20' || (c) == '\x21' || ((c) >= '\x23' && (c) <= '\x5B') \
+    || ((c) >= '\x5D' && (c) <= '\x10\xFF\xFF'))
 
 //static int is_valid_char(char c) {
 //    //C语言中的非ASCII字符是怎么表示的? 通用的表示方法是什么样的?
@@ -173,7 +173,7 @@ static char unescape(const char **p) {
 //    //int bool2 = (c) >= '\x5D';
 //    //int bool3 = (c) <= '\x10\xFF\xFF'; //一个字符分成三个字节表示
 //
-//    return (c) == '\x20' || (c) == '\x21' || ((c) >= '\x23' && (c) <= '\x5B') \
+//    return (c) == '\x20' || (c) == '\x21' || ((c) >= '\x23' && (c) <= '\x5B')
 // || ((c) >= '\x5D' && (c) <= '\x10\xFF\xFF');
 //}
 
