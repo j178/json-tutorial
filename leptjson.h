@@ -6,14 +6,22 @@
 typedef enum { LEPT_NULL, LEPT_FALSE, LEPT_TRUE, LEPT_NUMBER, LEPT_STRING, LEPT_ARRAY, LEPT_OBJECT } lept_type;
 
 typedef struct lept_value lept_value; //后面直接使用 lept_value 声明变量的地方就等于使用了 struct lept_value
+typedef struct lept_member lept_member;
 
 struct lept_value { // 放在 struct 关键字后面的是结构体类型的名字，放在后面的是这个结构体类型的一个变量
     lept_type type;
     union {
+        struct { lept_member *m; size_t size; } o;
         struct { char *s; size_t len; } s;
         double n;
         struct { lept_value *e; size_t size; } a; //数组用什么实现, 动态数组还是链表? 还要实现访问, 添加, 插入的函数
     } u;
+};
+
+struct lept_member {
+    char *k; //memebr key string
+    size_t ken; //member key string length
+    lept_value *v; //member key value
 };
 
 enum {
@@ -55,4 +63,9 @@ size_t lept_get_array_size(const lept_value *v);
 
 lept_value *lept_get_array_element(const lept_value *v, size_t index);
 
+
+size_t lept_get_object_size(const lept_value *v);
+const char *lept_get_object_key(const lept_value *v, size_t index);
+size_t lept_get_object_key_length(const lept_value *v, size_t index);
+lept_value *lept_get_object_value(const lept_value *v, size_t index);
 #endif /* LEPTJSON_H__ */

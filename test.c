@@ -248,33 +248,24 @@ static void test_parse_array() {
     EXPECT_EQ_INT(LEPT_NULL, lept_get_type(lept_get_array_element(&v, 0)));
     EXPECT_EQ_INT(0, lept_get_boolean(lept_get_array_element(&v, 1)));
     EXPECT_EQ_INT(1, lept_get_boolean(lept_get_array_element(&v, 2)));
-    EXPECT_EQ_INT(123, lept_get_number(lept_get_array_element(&v, 3)));
+    EXPECT_EQ_DOUBLE((double)123, lept_get_number(lept_get_array_element(&v, 3)));
     EXPECT_EQ_STRING("abc", lept_get_string(lept_get_array_element(&v, 4)), 3);
     lept_free(&v);
 
     EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, " [ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"));
     EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(&v));
     EXPECT_EQ_SIZE_T(4, lept_get_array_size(&v));
-
-    lept_value *e0 = lept_get_array_element(&v, 0);
-    EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(e0));
-    EXPECT_EQ_INT(0, lept_get_array_size(e0));
-    lept_value *e1 = lept_get_array_element(&v, 1);
-    EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(e1));
-    EXPECT_EQ_INT(1, lept_get_array_size(e1));
-    EXPECT_EQ_INT(0, lept_get_number(lept_get_array_element(e1, 0)));
-    lept_value *e2 = lept_get_array_element(&v, 2);
-    EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(e2));
-    EXPECT_EQ_INT(2, lept_get_array_size(e2));
-    EXPECT_EQ_INT(0, lept_get_number(lept_get_array_element(e2, 0)));
-    EXPECT_EQ_INT(1, lept_get_number(lept_get_array_element(e2, 1)));
-    lept_value *e3 = lept_get_array_element(&v, 3);
-    EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(e3));
-    EXPECT_EQ_INT(3, lept_get_array_size(e3));
-    EXPECT_EQ_INT(0, lept_get_number(lept_get_array_element(e3, 0)));
-    EXPECT_EQ_INT(1, lept_get_number(lept_get_array_element(e3, 1)));
-    EXPECT_EQ_INT(2, lept_get_number(lept_get_array_element(e3, 2)));
-
+    for (size_t i = 0; i < 4; i++) {
+        lept_value *a = lept_get_array_element(&v, i);
+        EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(a));
+        EXPECT_EQ_SIZE_T(i, lept_get_array_size(a));
+        for (size_t j = 0; j < i; j++) {
+            lept_value *e = lept_get_array_element(a, j);
+            EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(e));
+            EXPECT_EQ_DOUBLE((double) j, lept_get_number(e));
+        }
+    }
+    lept_free(&v); //这里忘了释放了
 }
 
 static void test_parse_miss_comma_or_square_bracket() {

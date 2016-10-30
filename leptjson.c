@@ -10,6 +10,12 @@
 #endif
 
 #define EXPECT(c, ch) do { assert(*c->json == (ch)); c->json++; } while(0)
+#define ISDIGIT(c) ((c) >='0' && (c) <='9')
+#define ISDIGIT1TO9(c) ((c)>='1' && (c) <= '9')
+#define ISHEX(c) (ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || ((c) >= 'A' && (c) <= 'F'))
+
+#define PUTC(c, ch) do{ *(char *) lept_context_push(c, sizeof (char)) = (ch); } while(0)
+#define STRING_ERROR(error) do{ c->top=head; return error; } while(0)
 
 typedef struct {
     const char *json;
@@ -78,10 +84,6 @@ static int lept_parse_literal(lept_context *c, lept_value *v, lept_type type) {
     return 0;
 }
 
-#define ISDIGIT(c) ((c) >='0' && (c) <='9')
-#define ISDIGIT1TO9(c) ((c)>='1' && (c) <= '9')
-#define ISHEX(c) (ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || ((c) >= 'A' && (c) <= 'F'))
-
 /**
  * number = [ "-" ] int [ frac ] [ exp ]
  * int = "0" / digit1-9 *digit
@@ -127,31 +129,22 @@ static int lept_parse_number(lept_context *c, lept_value *v) {
 void lept_free(lept_value *v) {
 
     assert(v != NULL);
-    if (lept_get_type(v) == LEPT_STRING) {
-        free(v->u.s.s);
-    } else if (lept_get_type(v) == LEPT_ARRAY) {
-        //解析失败则类型为NULL, 就不会进入到这里面来
-        //每一个元素都要释放
-        for (size_t i = 0; i < lept_get_array_size(v); i++) {
-            lept_free(lept_get_array_element(v, i));
-        }
+    switch (v->type) {
+        case LEPT_STRING:
+            free(v->u.s.s);
+            break;
+        case LEPT_ARRAY:
+            //解析失败则类型为NULL, 就不会进入到这里面来
+            //free 每一个元素指向的地址, 但容器本身没有 free
+            for (size_t i = 0; i < v->u.a.size; i++)
+                lept_free(&v->u.a.e[i]);
+            free(v->u.a.e); //每一个 malloc 都要有相应的 free
+            break;
+        default:
+            break;
     }
     v->type = LEPT_NULL;
 }
-
-#define PUTC(c, ch) do{ *(char *) lept_context_push(c, sizeof (char)) = (ch); } while(0)
-
-
-//static int is_valid_char(char c) {
-//    //C语言中的非ASCII字符是怎么表示的? 通用的表示方法是什么样的?
-//
-//    //int bool1 = (c) >= '\x23' && (c) <= '\x5B';
-//    //int bool2 = (c) >= '\x5D';
-//    //int bool3 = (c) <= '\x10\xFF\xFF'; //一个字符分成三个字节表示
-//
-//    return (c) == '\x20' || (c) == '\x21' || ((c) >= '\x23' && (c) <= '\x5B')
-// || ((c) >= '\x5D' && (c) <= '\x10\xFF\xFF');
-//}
 
 static int hex_to_int(char h) {
 
@@ -194,8 +187,6 @@ static void lept_encode_utf8(lept_context *c, unsigned u) {
         PUTC(c, 0x80 | (u & 0x3F));
     }
 }
-
-#define STRING_ERROR(error) do{ c->top=head; return error; } while(0)
 
 static int lept_parse_string(lept_context *c, lept_value *v) {
     //1. 尽可能多的解析字符吗?
@@ -290,7 +281,6 @@ static int lept_parse_array(lept_context *c, lept_value *v) {
 
     size_t size = 0;
     int ret;
-    size_t head = c->top;
     EXPECT(c, '[');
     lept_parse_whitespace(c);
     if (*c->json == ']') {
@@ -302,16 +292,12 @@ static int lept_parse_array(lept_context *c, lept_value *v) {
     }
     for (;;) {
         lept_value e;
+        //lept_value *e = lept_context_push(c, sizeof(lept_value)); //一个有bug的写法, 但是还不知道有什么bug
+        //这种写法, 如果后面的realloc ... 就会产生指针悬挂
         lept_init(&e);
         lept_parse_whitespace(c);
         if ((ret = lept_parse_value(c, &e)) != LEPT_PARSE_OK) {
-            //c->top = head;
-            //怎么 free 堆栈中每个元素?
-            for (size_t i = 0; i < size; i++) {
-                lept_value *elem = (lept_value *) lept_context_pop(c, sizeof(lept_value));
-                lept_free(elem);
-            }
-            return ret;
+            break; //解析出错, 跳出循环
         }
         //在数组完全解析完成之前, 每个元素(而不是不是指针)都临时放在堆栈中
         memcpy(lept_context_push(c, sizeof(lept_value)), &e, sizeof(lept_value));
@@ -324,17 +310,18 @@ static int lept_parse_array(lept_context *c, lept_value *v) {
             v->type = LEPT_ARRAY;
             v->u.a.size = size;
             size *= sizeof(lept_value); //整个 array 的大小
-            memcpy(v->u.a.e = (lept_value *) malloc(size), lept_context_pop(c, size), size); //生成整个数组
+            memcpy(v->u.a.e = (lept_value *) malloc(size), lept_context_pop(c, size), size); //弹出整个数组
             return LEPT_PARSE_OK;
         } else {
-            //c->top = head; //移动栈顶,空出来的位置后面就可以给后面的元素用了
-            for (size_t i = 0; i < size; i++) {
-                lept_value *elem = (lept_value *) lept_context_pop(c, sizeof(lept_value));
-                lept_free(elem);
-            }
-            return LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+            ret = LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+            break;
         }
     }
+    //c->top = head; //移动栈顶,空出来的位置后面就可以给后面的元素用了, 就相当于完成了pop
+    for (size_t i = 0; i < size; i++) {
+        lept_free(lept_context_pop(c, sizeof(lept_value)));
+    }
+    return ret;
 }
 
 static int lept_parse_value(lept_context *c, lept_value *v) {
@@ -427,7 +414,7 @@ void lept_set_string(lept_value *v, const char *s, size_t len) {
     assert(v != NULL && (s != NULL || len == 0));
     lept_free(v);
     v->u.s.s = (char *) malloc(len + 1);
-    //Copies count characters from the object pointed to by src to the object pointed to by dest.
+    // Copies count characters from the object pointed to by src to the object pointed to by dest.
     // Both objects are interpreted as arrays of unsigned char.
     memcpy(v->u.s.s, s, len);
     v->u.s.s[len] = '\0';
@@ -453,3 +440,7 @@ lept_value *lept_get_array_element(const lept_value *v, size_t index) {
     assert(index < v->u.a.size);
     return &v->u.a.e[index];
 }
+
+//lept_value *lept_get_object_element(const lept_value *v, const char *key) {
+//
+//}
