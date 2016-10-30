@@ -362,9 +362,6 @@ static int lept_parse_object(lept_context *c, lept_value *v) {
     lept_member m;
     m.k = NULL;
     for (;;) {
-        lept_init(&m.v);
-        char *str = NULL;
-
         lept_parse_whitespace(c);
         if (*c->json != '"') {
             ret = LEPT_PARSE_MISS_KEY;
@@ -372,11 +369,10 @@ static int lept_parse_object(lept_context *c, lept_value *v) {
         }
         c->json++; //跳过"
 
+        char *str = NULL;
         ret = lept_parse_string_raw(c, &str, &m.klen);
         if (ret != LEPT_PARSE_OK) {
-            if (ret == LEPT_PARSE_MISS_QUOTATION_MARK) {
-                ret = LEPT_PARSE_MISS_KEY;
-            }
+            if (ret == LEPT_PARSE_MISS_QUOTATION_MARK) ret = LEPT_PARSE_MISS_KEY;
             break;
         }
 
@@ -393,8 +389,9 @@ static int lept_parse_object(lept_context *c, lept_value *v) {
             break;
         }
         c->json++; //skip :
-        lept_parse_whitespace(c);
 
+        lept_init(&m.v);
+        lept_parse_whitespace(c);
         if ((ret = lept_parse_value(c, &m.v)) != LEPT_PARSE_OK) break;
 
         memcpy(lept_context_push(c, sizeof(lept_member)), &m, sizeof(m)); //解析完一个成员, 暂存到堆栈中

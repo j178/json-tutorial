@@ -1,0 +1,7 @@
+language: c
+compiler: clang
+
+script:
+  - mkdir build && cd build
+  - cmake ..
+  - make && ./leptjson_test
