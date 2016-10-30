@@ -140,6 +140,13 @@ void lept_free(lept_value *v) {
                 lept_free(&v->u.a.e[i]);
             free(v->u.a.e); //每一个 malloc 都要有相应的 free
             break;
+        case LEPT_OBJECT:
+            for (size_t i = 0; i < v->u.o.size; i++) {
+                free(v->u.o.m[i].k);
+                lept_free(&v->u.o.m[i].v);
+            }
+            free(v->u.o.m);
+            break;
         default:
             break;
     }
@@ -381,9 +388,11 @@ static int lept_parse_object(lept_context *c, lept_value *v) {
         lept_parse_whitespace(c);
         if (*c->json != ':') {
             ret = LEPT_PARSE_MISS_COLON;
+            //从这里中途退出, size还没有++, 所以为key分配的内存就无法释放, 需要在这里手动释放
+            free(m.k);
             break;
         }
-        c->json++;
+        c->json++; //skip :
         lept_parse_whitespace(c);
 
         if ((ret = lept_parse_value(c, &m.v)) != LEPT_PARSE_OK) break;
