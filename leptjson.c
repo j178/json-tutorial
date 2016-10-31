@@ -254,6 +254,8 @@ static int lept_parse_string_raw(lept_context *c, char **str, size_t *len) {
                                 STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
                             //将 (H,L) 代理对转换为真实的 code point
                             u = 0x10000 + (u - 0xD800) * 0x400 + (u2 - 0xDC00);
+                        } else if (u >= 0xDC00 && u <= 0xDCFF) {//位于低代理位
+                            STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
                         }
                         //将 code point 按照 utf8 编码为多个字节, 写入到缓冲区中
                         lept_encode_utf8(c, u);
